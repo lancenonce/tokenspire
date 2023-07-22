@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: BSD-3-Clause-Clear
+// A breathing token economy
 
 pragma solidity >=0.8.13 <0.9.0;
 
@@ -28,6 +29,7 @@ contract Tokenspire is ERC20, ERC20Burnable, Ownable {
         uint256 phase = period % 100;
         uint32 rawBurnRate;
 
+        // updating burnRate to oscillate between 0 and 10% over 100 blocks
         if (phase < 25) {
             rawBurnRate = BASE_HEIGHT + uint32((5 * phase) / 25);
             burnRate = TFHE.asEuint32(rawBurnRate);
@@ -41,6 +43,9 @@ contract Tokenspire is ERC20, ERC20Burnable, Ownable {
             rawBurnRate = uint32((5 * (phase - 75)) / 25);
             burnRate = TFHE.asEuint32(rawBurnRate);
         }
+        // we shift the burn rate right 2 bits to get an estimated "percentage."
+        // This may result in 0, which is okay for the hackathon
+        burnRate = TFHE.shr(burnRate, 2);
     }
 
     function transferEncrypted(address to, bytes calldata encryptedAmount) public {
@@ -48,8 +53,16 @@ contract Tokenspire is ERC20, ERC20Burnable, Ownable {
     }
 
     function _transferEncrypted(address to, euint32 amount) internal {
-        updateBurnRate();
+        _transferImpl(msg.sender, to, amount);
     }
 
-    function _transferImple(address from, address to, euint32 amount) internal {}
+    function _transferImpl(address from, address to, euint32 amount) internal {
+        TFHE.req(TFHE.le(amount, _encryptedBalances[from]));
+        updateBurnRate();
+        euint32 burnAmount = TFHE.mul(amount, burnRate);
+        euint32 transferAmount = TFHE.sub(amount, burnAmount);
+
+        _encryptedBalances[to] = TFHE.add(_encryptedBalances[to], transferAmount);
+        _encryptedBalances[from] = TFHE.sub(_encryptedBalances[from], amount);
+    }
 }
