@@ -5,16 +5,16 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
 
-  const counter = await deploy("Counter", {
+  const tokenspire = await deploy("tokenspire", {
     from: deployer,
     args: [],
     log: true,
     skipIfAlreadyDeployed: false,
   });
 
-  console.log(`Counter contract: `, counter.address);
+  console.log(`Tokenspire contract: `, tokenspire.address);
 };
 
 export default func;
-func.id = "deploy_counter";
-func.tags = ["Counter"];
+func.id = "deploy_tokenspire";
+func.tags = ["Tokenspire"];
