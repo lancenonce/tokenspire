@@ -9,23 +9,47 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 
 contract Tokenspire is ERC20, ERC20Burnable, Ownable {
     mapping(address => euint32) internal _encryptedBalances;
+    uint256 public startBlock;
+    euint32 internal burnRate;
+    uint32 public constant MAX_HEIGHT = 10;
+    uint32 public constant BASE_HEIGHT = 5;
 
     constructor() ERC20("Tokenspire", "TSP") {
         _mint(msg.sender, 1000000000 * 10 ** decimals());
+        startBlock = block.number;
     }
 
     function balanceOfEncrypted(address sender, bytes32 publicKey) public view returns (bytes memory) {
         return TFHE.reencrypt(_encryptedBalances[sender], publicKey);
     }
 
-    euint32 private counter;
+    function updateBurnRate() internal {
+        uint256 period = block.number - startBlock;
+        uint256 phase = period % 100;
+        uint32 rawBurnRate;
 
-    function add(bytes calldata encryptedValue) public {
-        euint32 value = TFHE.asEuint32(encryptedValue);
-        counter = TFHE.add(counter, value);
+        if (phase < 25) {
+            rawBurnRate = BASE_HEIGHT + uint32((5 * phase) / 25);
+            burnRate = TFHE.asEuint32(rawBurnRate);
+        } else if (phase < 50) {
+            rawBurnRate = MAX_HEIGHT - uint32((5 * (phase - 25)) / 25);
+            burnRate = TFHE.asEuint32(rawBurnRate);
+        } else if (phase < 75) {
+            rawBurnRate = BASE_HEIGHT - uint32((5 * (phase - 50)) / 25);
+            burnRate = TFHE.asEuint32(rawBurnRate);
+        } else {
+            rawBurnRate = uint32((5 * (phase - 75)) / 25);
+            burnRate = TFHE.asEuint32(rawBurnRate);
+        }
     }
 
-    function getCounter(bytes32 publicKey) public view returns (bytes memory) {
-        return TFHE.reencrypt(counter, publicKey);
+    function transferEncrypted(address to, bytes calldata encryptedAmount) public {
+        _transferEncrypted(to, TFHE.asEuint32(encryptedAmount));
     }
+
+    function _transferEncrypted(address to, euint32 amount) internal {
+        updateBurnRate();
+    }
+
+    function _transferImple(address from, address to, euint32 amount) internal {}
 }
